@@ -172,7 +172,7 @@
 
             if (pageType.value === 'practice') {
                 updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
-                trialInfo.innerHTML = 'Practice' + trialInfo.innerHTML;
+                trialInfo.innerHTML = 'Practice ' + trialInfo.innerHTML;
             } else {
                 updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
             }
@@ -509,7 +509,7 @@
 
                         if (data.page_type === 'practice') {
                             updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
-                            trialInfo.innerHTML = 'Practice' + trialInfo.innerHTML;
+                            trialInfo.innerHTML = 'Practice ' + trialInfo.innerHTML;
                         } else {
                             updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
                         }
