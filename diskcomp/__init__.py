@@ -542,7 +542,6 @@ class PracticeTrialPage(Page):
     @staticmethod
     def vars_for_template(player: Player):
         trial = practice_trial_generator(player, 0)
-        print(trial)
         return {
             "trial_id": 0,
             "target": trial["target"],
