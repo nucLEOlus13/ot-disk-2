@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy.ext.declarative import DeclarativeMeta  # type: ignore
 from otree.api import (  # type: ignore
     BaseConstants,
@@ -9,9 +10,7 @@ from otree.api import (  # type: ignore
     ExtraModel,
 )
 from otree.models import Participant  # type: ignore
-import json
-from random import randint, choice
-from datetime import datetime, timedelta
+from random import randint, choice, seed
 from typing import ClassVar, Generator, Any, Literal
 from pathlib import Path
 import pandas as pd
@@ -74,6 +73,7 @@ class DataCache:
             image_df = pd.read_csv(C.STIM_IMAGE_CSV)
             cls.image_file_list = image_df["filename"].map(lambda x: (C.STIM_PATH / x).as_posix()).tolist()
         return cls.image_file_list
+    
 
 class Subsession(BaseSubsession, metaclass=AnnotationFreeMeta):
     pass
@@ -230,9 +230,11 @@ def get_practice_stims() -> list[str]:
     ]
 
 
-def practice_trial_generator() -> Generator[dict[str, str | int | bool], None, None]:
+def practice_trial_generator(player: Player, idx: int) -> dict[str, str | int | bool]:
     stims = get_practice_stims()
     n_practice = len(stims)
+    # Seed random generator for reproducibility per player
+    seed(player.id_in_group)
     for i in range(C.NUM_PRACTICE_TRIALS):
         target_idx = randint(0, n_practice - 1)
         remaining = [j for j in range(n_practice) if j != target_idx]
@@ -240,12 +242,15 @@ def practice_trial_generator() -> Generator[dict[str, str | int | bool], None, N
         remaining.remove(left_idx)
         right_idx = choice(remaining)
 
-        yield {
-            "target": stims[target_idx],
-            "left_option": stims[left_idx],
-            "right_option": stims[right_idx],
-            "trial": i,
-        }
+        if i == idx:
+            return {
+                "target": stims[target_idx],
+                "left_option": stims[left_idx],
+                "right_option": stims[right_idx],
+                "trial": i,
+            }
+
+    return {}
 
 
 def creating_session(subsession: Subsession) -> None:
@@ -355,7 +360,7 @@ class StimuliComparisonPage(Page):
                 "num_trials": C.TOTAL_TRIALS,
                 "trials_in_block": C.TRIALS_IN_BLOCK,
                 "page_type": "experiment",
-                "image_preloads": [],
+                "image_preloads": DataCache.get_image_file_list(),
             }
 
         left_option, right_option, displayed_left = determine_display_positions(trial)
@@ -536,17 +541,16 @@ class PracticeTrialPage(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        practice_trials = practice_trial_generator()
-        trial = next(practice_trials)
+        trial = practice_trial_generator(player, 0)
         return {
-            "trial_id": trial["trial"],
+            "trial_id": 0,
             "target": trial["target"],
             "left_option": trial["left_option"],
             "right_option": trial["right_option"],
             "num_trials": C.NUM_PRACTICE_TRIALS,
             "trials_in_block": C.NUM_PRACTICE_TRIALS,
             "page_type": "practice",
-            "image_preloads": DataCache.get_image_file_list(),
+            "image_preloads": get_practice_stims(),
         }
 
     @staticmethod
@@ -562,13 +566,7 @@ class PracticeTrialPage(Page):
             event = data["event"]
 
             if event == "start":
-                practice_trials = practice_trial_generator()
-                trial = next(practice_trials)
-                response[player.id_in_group]["event"] = "trial"
-                response[player.id_in_group]["trial_id"] = trial["trial"]
-                response[player.id_in_group]["target"] = trial["target"]
-                response[player.id_in_group]["left_option"] = trial["left_option"]
-                response[player.id_in_group]["right_option"] = trial["right_option"]
+                response[player.id_in_group]["event"] = "start_ack"
                 
             elif event == "choice":
                 if int(data["trial"]) < C.NUM_PRACTICE_TRIALS - 1:
@@ -578,13 +576,10 @@ class PracticeTrialPage(Page):
                     response[player.id_in_group]["event"] = "end"
 
             elif event == "next":
-                practice_trials = practice_trial_generator()
-                trial = next(practice_trials)
-                if "trial" in data:
-                    response[player.id_in_group]["trial_id"] = int(data["trial"]) + 1
-                else:
-                    response[player.id_in_group]["trial_id"] = trial["trial"]
+                trial_id = int(data["trial"]) + 1 if "trial" in data else 0
+                trial = practice_trial_generator(player, trial_id)
                 response[player.id_in_group]["event"] = "trial"
+                response[player.id_in_group]["trial_id"] = trial_id
                 response[player.id_in_group]["target"] = trial["target"]
                 response[player.id_in_group]["left_option"] = trial["left_option"]
                 response[player.id_in_group]["right_option"] = trial["right_option"]

@@ -122,11 +122,11 @@
         const speedScale = 1.0;
         let timeout;
 
-        // listen for messages from the server
-        let liveRecv = function (data) {
-            // placeholder
-            console.log('received', data);
-        }
+        // // listen for messages from the server
+        // let liveRecv = function (data) {
+        //     // placeholder
+        //     console.log('received', data);
+        // }
 
         function updateCoord(pos, delta, max) {
             pos += delta * speedScale;
@@ -171,7 +171,8 @@
             console.log(rightOption.value);
 
             if (pageType.value === 'practice') {
-                trialInfo.innerHTML = 'Practice';
+                updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
+                trialInfo.innerHTML = 'Practice ' + trialInfo.innerHTML;
             } else {
                 updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
             }
@@ -354,9 +355,9 @@
                 const textWidth = ctx.measureText(text).width;
                 const textHeight = ctx.measureText('W').width;
                 const vOffset = Math.floor(textHeight / 2);
-                console.log(vOffset);
+
                 ctx.fillText(text, canvas.width / 2 - textWidth / 2, canvas.height / 2 + vOffset);
-            
+
                 // draw a rectangle around the text
                 ctx.beginPath();
                 ctx.rect(canvas.width / 2 - textWidth / 2 - 5, canvas.height / 2 - vOffset - 5, textWidth + 10, textHeight + 10);
@@ -370,7 +371,6 @@
                 const textWidth = ctx.measureText(text).width;
                 const textHeight = ctx.measureText('W').width;
                 const vOffset = Math.floor(textHeight / 2);
-                console.log(vOffset);
                 ctx.fillText(text, canvas.width / 2 - textWidth / 2, canvas.height / 2 + vOffset);
             }
 
@@ -475,13 +475,15 @@
                 return;
             }
             
-            console.log('trial', trial.value);
             updateTrial();
-            clearCanvas();
-            drawContinueButton();
-            canvas.addEventListener("click", () => {
-                startTrial();
-            }, { once: true });
+            sleep(100).then(() => {
+                clearCanvas();
+                drawContinueButton();
+                canvas.addEventListener("click", () => {
+                    console.log('continuing to trial');
+                    startTrial();
+                }, { once: true });
+            });
             
 
             liveRecv = function(data) {
@@ -506,7 +508,8 @@
                         pageType.value = data.page_type;
 
                         if (data.page_type === 'practice') {
-                            trialInfo.innerHTML = 'Practice';
+                            updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
+                            trialInfo.innerHTML = 'Practice ' + trialInfo.innerHTML;
                         } else {
                             updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
                         }
