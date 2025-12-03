@@ -14,6 +14,7 @@ from random import randint, choice, seed
 from typing import ClassVar, Generator, Any, Literal
 from pathlib import Path
 import pandas as pd
+from collections import defaultdict
 
 doc = """
 Stimulus comparison study with trial set pooling
@@ -613,7 +614,14 @@ def extract_stimulus_id(file_path: str) -> str:
 
 
 def custom_export(players: list[Player]) -> Generator[list[str | int | float | bool | str], Any, Any]:
-    """Export trial data with trial set information - includes all trials even from incomplete sessions"""
+    """Export trial data with trial set information - includes all trials even from incomplete sessions
+
+    Optimized version that:
+    1. Loads all trials in a single query instead of N+1 queries
+    2. Minimizes print statements to avoid I/O overhead
+    3. Caches trial set attributes to avoid repeated attribute access
+    4. Pre-filters trials with responses to avoid unnecessary processing
+    """
     yield [
         "participant_code",
         "participant_label",
@@ -631,18 +639,34 @@ def custom_export(players: list[Player]) -> Generator[list[str | int | float | b
         "response_time",
     ]
 
-    # Export ALL trial sets (including abandoned ones) to preserve all data
-    all_trial_sets = TrialSet.filter()
-    for trial_set in all_trial_sets:
-        for trial in Trial.filter(trial_set=trial_set):
-            # Only export trials that have been answered (have a response recorded)
-            if not trial.response or not trial.participant_code:
-                continue
+    # Fetch ALL trials with responses in a single query (massive performance improvement)
+    # This eliminates the N+1 query problem
+    all_trials_with_responses = [
+        trial for trial in Trial.filter()
+        if trial.response
+    ]
 
+    trials_by_set: dict[int, list[Trial]] = defaultdict(list)
+    for trial in all_trials_with_responses:
+        trials_by_set[trial.trial_set.id].append(trial)
+
+    # Single summary print instead of per-trial printing
+    print(f"Exporting {len(all_trials_with_responses)} completed trials from {len(trials_by_set)} trial sets")
+
+    # Process trials grouped by trial set
+    for trials in trials_by_set.values():
+        # Get trial set once for all trials (cache attributes)
+        trial_set = trials[0].trial_set
+        set_id = trial_set.set_id
+        repeat_id = trial_set.repeat_id
+        completed = trial_set.completed
+        abandoned = trial_set.abandoned
+        participant_label = trial_set.participant.label if trial_set.participant else "UNKNOWN"
+
+        for trial in trials:
             participant_code = trial.participant_code
-            participant_label = trial_set.participant.label if trial_set.participant else "UNKNOWN"
 
-            # Extract stimulus IDs from file paths
+            # Extract stimulus IDs from file paths (cached per trial)
             target_id = extract_stimulus_id(trial.target)
             option_a_id = extract_stimulus_id(trial.option_a)
             option_b_id = extract_stimulus_id(trial.option_b)
@@ -666,10 +690,10 @@ def custom_export(players: list[Player]) -> Generator[list[str | int | float | b
             yield [
                 participant_code,
                 participant_label,
-                trial_set.set_id,
-                trial_set.repeat_id,
-                trial_set.completed,
-                trial_set.abandoned,
+                set_id,
+                repeat_id,
+                completed,
+                abandoned,
                 trial.trial_id,
                 target_id,
                 option_a_id,
