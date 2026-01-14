@@ -41,8 +41,8 @@ class C(BaseConstants):
     STIM_CSV: Path = Path(__file__).parent / "_private/trial_list.csv"
     STIM_IMAGE_CSV: Path = Path(__file__).parent / "_private/stim.csv"
     NUM_PRACTICE_TRIALS: int = 3
-    TRIALS_IN_BLOCK: int = 100
-    TOTAL_TRIALS: int = 400
+    TRIALS_IN_BLOCK: int = 107 # updated from 100
+    TOTAL_TRIALS: int = 428 # updated from 400
     NUM_BLOCKS: int = 4
 
     # Primary timeout: minimum time before a trial set can be considered for abandonment

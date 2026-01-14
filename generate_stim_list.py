@@ -49,6 +49,7 @@ comparisons: dict[str, list[tuple[str, ...]]] = {}
 sorted_stimuli: list[str] = sorted(stimulus_ids)
 trial_combinations: list[tuple[str, str, str]] = []
 
+
 with open(output_file, "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
     writer.writerow(["option_a", "option_b", "target"])
@@ -61,6 +62,9 @@ with open(output_file, "w", newline="", encoding="utf-8") as f:
                     continue
                 # sort the options to avoid duplicates (a,b,target) == (b,a,target)
                 option_pair: tuple[str, ...] = tuple(sorted((option_a, option_b,)))
+                # comments (CS): we could add a new if statement here;
+                # provide a list of existing comparisons from the pilot; and discard those from the new stimuli set
+
                 if target not in comparisons.keys():
                     comparisons[target] = [option_pair]
                     writer.writerow([option_pair[0], option_pair[1], target])
@@ -75,9 +79,11 @@ with open(output_file, "w", newline="", encoding="utf-8") as f:
 
 print(f"Generated {n_results} unique combinations")
 
-n_participants = 180
-n_trials_per_participant = 400
-expected_repeats = 3
+#n_participants = 180 # this needs to be updated
+n_participants = 155
+#n_trials_per_participant = 400 # and maybe this as well --> to make it fit
+n_trials_per_participant = 428
+expected_repeats = 3 # does this refer to the repetitions of each unique stimuli combination?
 
 shuffle(trial_combinations)
 
