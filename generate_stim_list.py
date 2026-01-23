@@ -16,18 +16,6 @@ from random import shuffle
 # from random import randint
 import re
 
-##### COMMENT, CS, 20-01-2026 ######
-# For the second data collection (155 participants)
-# this script was only used to generate
-# an initial trial list with all trials (23310 * 3 = 69,930)
-# appearing 3 times, distributed between 155 participants
-# in unique sets. The script deliberately overshoots
-# to create sets of equal length. The output: 'trial_list_all_stim.csv'
-# has been processed in a separate R script (currently called 'Disk Comp Data.Rmd')
-# to remove pilot trials
-# please do not run this script before the collection is done
-# as it could overwrite the trial set
-
 ###################################
 ######### MAIN VARIABLES #########
 ###################################
@@ -39,8 +27,7 @@ expected_repeats: int = 3 # expected number of repeats per unique stimuli combin
 # if it is None, the script will generate from scratch
 # if it is specified, the results from the previous study
 # will be subtracted from the expected repeats
-previous_trial_results_file: Path | None = None
-#previous_trial_results_file = Path("diskcomp/_private/pilot_rated_stims_clean_names_sorted.csv")
+previous_trial_results_file: Path | None = Path("diskcomp/_private/pilot_rated_stims_clean_names_sorted.csv")
 # e.g.
 # previous_trial_results_file = Path("path_to_pilot/pilot_trial_results.csv")
 
@@ -109,11 +96,9 @@ with open(output_file, "w", newline="", encoding="utf-8") as f:
                         n_results += 1
 
 print(f"Generated {n_results} unique combinations") # 23310
-#print("trial_combos:", trial_combinations)
 
 # Read previous trial results to account for completed trials
 pilot_result_trial_combinations: dict[tuple[str, ...], int] = {}
-#pilot_result_trial_combinations = {combo: 0 for combo in trial_combinations}
 n_trials_in_pilot = 0
 
 # read csv of existing trials
@@ -134,29 +119,64 @@ if previous_trial_results_file is not None:
                 pilot_result_trial_combinations[unique_id] += 1
             n_trials_in_pilot += 1
 
-#print("pilot_result_trial_combinations", pilot_result_trial_combinations) # this looks exactly right
+print(f"Found {n_trials_in_pilot} completed trials in pilot data")
+# show number of combinations that appear more than once from pilot
+for combination, count in pilot_result_trial_combinations.items():
+    if count > 1:
+        print(f"Combination {combination} appears {count} times in pilot data")
+
 
 ######## Do not use this to calculate.
-n_trials_per_participant = 452 # ceil((n_results * expected_repeats - n_trials_in_pilot) / n_participants)
+n_trials_per_participant = ceil((n_results * expected_repeats - n_trials_in_pilot) / n_participants)
 print(f"To achieve ~{expected_repeats} repeats per combination:"
       f" {n_participants} trial sets x {n_trials_per_participant} trials ="
       f" {n_participants * n_trials_per_participant} total trials")
 # 427.935483871
 # 66330 -> 66341
-shuffle(trial_combinations)
+trial_pool = trial_combinations * 3
 
+shuffle(trial_combinations)
 # Create a CSV file that assigns trials to participants
 # Note: "participant_id" here represents a trial set, not an actual participant
-output_file = Path("diskcomp/_private/trial_list_all_stim.csv")
+output_file = Path("diskcomp/_private/trial_list.csv")
+
+print(f"Trial pool size before removing pilot completed trials: {len(trial_pool)}")
+# remove trials that were already completed in the pilot
+if previous_trial_results_file is not None:
+    for completed_combination in pilot_result_trial_combinations.keys():
+        # remove the number of completed trials from the trial pool
+        option_a, option_b, target = completed_combination
+        for _ in range(pilot_result_trial_combinations[completed_combination]):
+            if (option_a, option_b, target) in trial_pool:
+                trial_pool.remove((option_a, option_b, target))
+
+
+print(f"Trial pool size after removing pilot completed trials: {len(trial_pool)}")
+
+expected_total_trials = n_participants * n_trials_per_participant
+if len(trial_pool) < expected_total_trials:
+    print(f"WARNING: Trial pool size ({len(trial_pool)}) is smaller than expected total trials ({expected_total_trials})!")
+    print("Randomly allocating extra trials from the full set to fill the gap.")
+    number_required = expected_total_trials - len(trial_pool)
+    shuffle(trial_combinations)
+    trial_pool.extend(trial_combinations[:number_required])
+
 
 with open(output_file, "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
     writer.writerow(["participant_id", "trial_num", "option_a", "option_b", "target", "option_a_file", "option_b_file", "target_file"])
     for p in range(n_participants):
+        trials_allocated_to_participant: set[tuple[str, str, str]] = set()
         for t in range(n_trials_per_participant):
-            trial_index = (p * n_trials_per_participant + t) % len(trial_combinations)
-            option_a, option_b, target = trial_combinations[trial_index]
-
+            extra_index = 0
+            option_a, option_b, target = trial_pool[extra_index]
+            
+            while (option_a, option_b, target) in trials_allocated_to_participant:
+                extra_index += 1
+                # find a new trial that hasn't been allocated to this participant yet
+                option_a, option_b, target = trial_pool[extra_index]
+            trials_allocated_to_participant.add((option_a, option_b, target))
+            trial_pool.remove((option_a, option_b, target))
             writer.writerow([p + 1, t + 1, option_a, option_b, target, stim_file_map[option_a], stim_file_map[option_b], stim_file_map[target]])
 
 print(f"\nCreated trial assignments for {n_participants} trial sets")
@@ -166,13 +186,13 @@ print(f"Each trial set has {n_trials_per_participant} trials")
 stim_summary: dict[int, int] = {}
 stim_summary_excl_pilot: dict[int, int] = {}
 
+
+
 with open(output_file, "r", newline="", encoding="utf-8") as f:
     reader = csv.reader(f)
     next(reader)  # skip header
     participant_trials: dict[str, int] = {}
     combination_counts: dict[tuple[str, ...], int] = pilot_result_trial_combinations.copy()
-
-    print("combination_counts", combination_counts)
     # ('93a', '93b', '186b') =/= ('93b', '93a', '186b')
     # this is an example of random number of "completed" tirals from a pilot
     # this would be subtracted from the expected_repeats for those combinations
@@ -214,39 +234,21 @@ with open(output_file, "r", newline="", encoding="utf-8") as f:
         option_b = row[3]
         target = row[4]
 
-        # # Normalize combination order for counting
-        # combination = tuple(sorted([option_a, option_b])) + (target,)
-        # if combination not in combination_counts:
-        #     combination_counts[combination] = 1
-        # else:
-        #     if combination_counts[combination] >= expected_repeats:
-        #         if combination in pilot_result_trial_combinations:
-        #             continue
-        #     combination_counts[combination] += 1
-        
-        # if participant_id not in participant_trials:
-        #     participant_trials[participant_id] = 1
-        # else:
-        #     participant_trials[participant_id] += 1
-        
-        # 1. ALWAYS increment the participant's trial count first
-        participant_trials[participant_id] = participant_trials.get(participant_id, 0) + 1
-
-        # 2. Extract and normalize
-        option_a, option_b, target = row[2], row[3], row[4]
+        # Normalize combination order for counting
         combination = tuple(sorted([option_a, option_b])) + (target,)
-
-        # 3. Handle combination counting/limits
         if combination not in combination_counts:
             combination_counts[combination] = 1
         else:
-            if combination_counts[combination] >= expected_repeats:
-                if combination in pilot_result_trial_combinations:
-                    # We still continue here if you want to stop incrementing the combo count,
-                    # but the participant has already been counted above!
-                    continue
             combination_counts[combination] += 1
-
+        
+        if participant_id not in participant_trials:
+            participant_trials[participant_id] = 1
+        else:
+            participant_trials[participant_id] += 1
+        
+        
+        
+    
     # Check for incorrect trial counts
     for participant_id, n_trials in participant_trials.items():
         if n_trials != n_trials_per_participant:
@@ -268,7 +270,7 @@ with open(output_file, "r", newline="", encoding="utf-8") as f:
             remaining_count = count - pilot_count
             stim_summary_excl_pilot[remaining_count] = stim_summary_excl_pilot.get(remaining_count, 0) + 1
         if count < expected_repeats:  # Allow some flexibility
-            #print(f"WARNING: Combination {combination} appears only {count} times")
+            print(f"WARNING: Combination {combination} appears only {count} times")
             pass
     
     print("\n=== Verification Summary ===")
