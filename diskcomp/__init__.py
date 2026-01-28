@@ -46,13 +46,13 @@ class C(BaseConstants):
     NUM_BLOCKS: int = 4
 
     # Primary timeout: minimum time before a trial set can be considered for abandonment
-    TRIAL_SET_TIMEOUT_MINUTES: int = 60 # chnaged from 60
+    TRIAL_SET_TIMEOUT_MINUTES: int = 1 # chnaged from 60
 
     # Inactivity timeout: if no response for this many minutes, consider participant inactive
     # Trial set is only abandoned if BOTH conditions are met:
     # 1. Time since lock > TRIAL_SET_TIMEOUT_MINUTES
     # 2. Time since last response > INACTIVITY_TIMEOUT_MINUTES
-    INACTIVITY_TIMEOUT_MINUTES: int = 5 # changed from 5
+    INACTIVITY_TIMEOUT_MINUTES: int = 1 # changed from 5
 
     # Optional: List of specific trial set IDs to load
     # If empty, all trial sets from CSV will be loaded
@@ -129,6 +129,28 @@ class TrialSet(ExtraModel, metaclass=AnnotationFreeMeta):
     subsession: BaseSubsession = models.Link(Subsession)
     current_trial: int = models.IntegerField(initial=0)
     participant: Participant | None = models.Link(Participant)
+
+    def check_and_mark_abandoned(self) -> bool: 
+        """Checks if the current trial set has timed out based on the constants defined in C. if so, marks it as abandoned immediately."""
+        if self.abandoned:
+            return True
+        
+        timeout_seconds = C.TRIAL_SET_TIMEOUT_MINUTES * 60
+        inactivity_seconds = C.INACTIVITY_TIMEOUT_MINUTES * 60
+        current_time = datetime.now().timestamp()
+
+        if self.lock_time > 0:
+            time_since_lock = current_time - self.lock_time
+
+            # use last_ressponse_time, or lock_time
+            last_activity = self.last_response_time if self.last_response_time > 0 else self.lock_time
+            time_since_lastactivity = current_time - last_activity
+
+            # check if timeout conditions are met (must exceed both)
+            if time_since_lock > timeout_seconds and time_since_lastactivity > inactivity_seconds:
+                self.abandoned = True
+                return True
+        return False
     
     @classmethod
     def get_available_set(cls, subsession: BaseSubsession) -> 'TrialSet | None':
@@ -530,8 +552,8 @@ class StimuliComparisonPage(Page):
             response[player.id_in_group]["message"] = "No trial set assigned"
             return response
         
-        if trial_set.abandoned:
-            response[player.id_in_group]["event"] = "error"
+        if trial_set.check_and_mark_abandoned():
+            response[player.id_in_group]["event"] = "timeout"
             response[player.id_in_group]["message"] = "Session timed out due to inactivity"
             return response
         
@@ -673,7 +695,7 @@ class StimuliComparisonPageBlockTwo(StimuliComparisonPage):
         if not trial_set:
             return False
         # add abandoned check
-        if trial_set.abandoned:
+        if trial_set.check_and_mark_abandoned():
             return False
         return (trial_set.current_trial >= C.TRIALS_IN_BLOCK and 
                 trial_set.current_trial < 2 * C.TRIALS_IN_BLOCK)
@@ -693,7 +715,7 @@ class StimuliComparisonPageBlockThree(StimuliComparisonPage):
         if not trial_set:
             return False
         # add abandoned check
-        if trial_set.abandoned:
+        if trial_set.check_and_mark_abandoned():
             return False
         return (trial_set.current_trial >= 2 * C.TRIALS_IN_BLOCK and 
                 trial_set.current_trial < 3 * C.TRIALS_IN_BLOCK)
@@ -713,7 +735,7 @@ class StimuliComparisonPageBlockFour(StimuliComparisonPage):
         if not trial_set:
             return False
         # add abandoned check
-        if trial_set.abandoned:
+        if trial_set.check_and_mark_abandoned():
             return False
         return (trial_set.current_trial >= 3 * C.TRIALS_IN_BLOCK and 
                 trial_set.current_trial < 4 * C.TRIALS_IN_BLOCK)

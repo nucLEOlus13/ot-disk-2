@@ -499,6 +499,15 @@
             liveRecv = function(data) {
                 const event = Object.keys(data).includes('event') ? data.event : null;
                 switch (event) {
+                    case "timeout":
+                        // Force reload
+                        // server can detect the abandoned flag in "is_displayed" and redirect to thank you page
+                        window.location.reload();
+                        break;
+                    case "error":
+                        // alert the uder before they get redirected / stuck
+                        alert(data.message);
+                        break;
                     case 'next':
                         // get trial id if sent
                         let trial_id = parseInt(trial.value);
