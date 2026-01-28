@@ -41,25 +41,25 @@ class C(BaseConstants):
     STIM_CSV: Path = Path(__file__).parent / "_private/trial_list.csv"
     STIM_IMAGE_CSV: Path = Path(__file__).parent / "_private/stim.csv"
     NUM_PRACTICE_TRIALS: int = 3
-    TRIALS_IN_BLOCK: int = 107 # updated from 100
-    TOTAL_TRIALS: int = 428 # updated from 400
+    TRIALS_IN_BLOCK: int = 107 # updated from 107
+    TOTAL_TRIALS: int = 428 # updated from 428
     NUM_BLOCKS: int = 4
 
     # Primary timeout: minimum time before a trial set can be considered for abandonment
-    TRIAL_SET_TIMEOUT_MINUTES: int = 60
+    TRIAL_SET_TIMEOUT_MINUTES: int = 60 # chnaged from 60
 
     # Inactivity timeout: if no response for this many minutes, consider participant inactive
     # Trial set is only abandoned if BOTH conditions are met:
     # 1. Time since lock > TRIAL_SET_TIMEOUT_MINUTES
     # 2. Time since last response > INACTIVITY_TIMEOUT_MINUTES
-    INACTIVITY_TIMEOUT_MINUTES: int = 5
+    INACTIVITY_TIMEOUT_MINUTES: int = 5 # changed from 5
 
     # Optional: List of specific trial set IDs to load
     # If empty, all trial sets from CSV will be loaded
     TRIAL_SETS_TO_LOAD: list[int] = []
 
     # Add attention checks (amount per block)
-    ATTENTION_CHECKS_PER_BLOCK: int = 2
+    ATTENTION_CHECKS_PER_BLOCK: int = 2 # changed from 2
     # Path to the stimuli (made a new folder specifacally for them)
     ATTENTION_CHECK_STIM_PATH: Path = Path("diskcomp/static/stimuli/att_checks")
 
@@ -193,6 +193,23 @@ class TrialSet(ExtraModel, metaclass=AnnotationFreeMeta):
                 trial_set=new_trial_set,
             )
 
+        # copy attention checks as well
+        original_checks = AttentionCheck.filter(trial_set=original_set)
+        for check in original_checks: 
+            AttentionCheck.create(
+                check_id=check.check_id,
+                block=check.block,
+                position_in_block=check.position_in_block,
+                target=check.target,
+                correct_option=check.correct_option,
+                incorrect_option=check.incorrect_option,
+                trial_set=new_trial_set,  # Link to the new set
+                # Explicitly reset state (though defaults handle most of this)
+                already_shown=False,
+                passed=False,
+                response=""
+            )
+
         #print(f"Created retry trial set: set_id={new_trial_set.set_id}, repeat_id={new_trial_set.repeat_id}")
         return new_trial_set
     
@@ -233,9 +250,12 @@ class Player(BasePlayer, metaclass=AnnotationFreeMeta):
         """Get the trial set assigned to this player"""
         if self.assigned_trial_set_id == -1:
             return None
+        
+        # filter by participant to ensure they get the new set, not the old abandoned one
         sets = TrialSet.filter(
             subsession=self.subsession,
-            set_id=self.assigned_trial_set_id
+            set_id=self.assigned_trial_set_id,
+            participant=self.participant
         )
         return sets[0] if sets else None
     
@@ -461,6 +481,10 @@ class StimuliComparisonPage(Page):
         trial_set = player.get_assigned_trial_set()
         if not trial_set:
             return False
+
+        # if set is abandoned, do not show this page
+        if trial_set.abandoned:
+            return False
         
         return trial_set.current_trial < C.TRIALS_IN_BLOCK
 
@@ -503,8 +527,12 @@ class StimuliComparisonPage(Page):
         
         trial_set = player.get_assigned_trial_set()
         if not trial_set:
-            response[player.id_in_group]["event"] = "error"
             response[player.id_in_group]["message"] = "No trial set assigned"
+            return response
+        
+        if trial_set.abandoned:
+            response[player.id_in_group]["event"] = "error"
+            response[player.id_in_group]["message"] = "Session timed out due to inactivity"
             return response
         
         if "event" in data:
@@ -644,6 +672,9 @@ class StimuliComparisonPageBlockTwo(StimuliComparisonPage):
         trial_set = player.get_assigned_trial_set()
         if not trial_set:
             return False
+        # add abandoned check
+        if trial_set.abandoned:
+            return False
         return (trial_set.current_trial >= C.TRIALS_IN_BLOCK and 
                 trial_set.current_trial < 2 * C.TRIALS_IN_BLOCK)
     
@@ -661,6 +692,9 @@ class StimuliComparisonPageBlockThree(StimuliComparisonPage):
         trial_set = player.get_assigned_trial_set()
         if not trial_set:
             return False
+        # add abandoned check
+        if trial_set.abandoned:
+            return False
         return (trial_set.current_trial >= 2 * C.TRIALS_IN_BLOCK and 
                 trial_set.current_trial < 3 * C.TRIALS_IN_BLOCK)
     
@@ -677,6 +711,9 @@ class StimuliComparisonPageBlockFour(StimuliComparisonPage):
     def is_displayed(player: Player):
         trial_set = player.get_assigned_trial_set()
         if not trial_set:
+            return False
+        # add abandoned check
+        if trial_set.abandoned:
             return False
         return (trial_set.current_trial >= 3 * C.TRIALS_IN_BLOCK and 
                 trial_set.current_trial < 4 * C.TRIALS_IN_BLOCK)
@@ -714,10 +751,21 @@ class ThankYouPage(Page):
         
         trial_set = player.get_assigned_trial_set()
         if trial_set:
-            trial_set.completed = True
+            # only mark as completed if it wasnt abandoned
+            if not trial_set.abandoned:
+                trial_set.completed = True
+            # always unlock
             trial_set.unlock()
         
         return True
+    
+    @staticmethod
+    def vars_for_template(player: Player):
+        trial_set = player.get_assigned_trial_set()
+        is_abandoned = trial_set.abandoned if trial_set else False
+        return {
+            "is_abandoned": is_abandoned
+        }
 
 
 class PracticeTrialPage(Page):

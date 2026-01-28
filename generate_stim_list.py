@@ -46,7 +46,7 @@ prevent_stimulus_repeat_within_n_trials: int = 2
 random_seed: int = 1999
 
 # number of trial sets to generate
-n_participants: int = 155
+n_participants: int = 155 # changed from 155
 # expected number of repeats per unique stimuli combination across all trial sets
 # this is a minimum target; actual repeats may be higher due to rounding
 expected_repeats: int = 3

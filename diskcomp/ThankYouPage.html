@@ -1,5 +1,9 @@
 {{ block title }}
-    Page title
+    {{ if is_abandoned }}
+        Session Timed Out
+    {{ else }}
+        Experiment Complete
+    {{ endif }}
 {{ endblock }}
 
 {{ block content }}
@@ -11,14 +15,25 @@
         margin-top: 2em;
     }
 </style>
+
 <div id="text-wrapper">
-    <div style="text-align: center;">
-        <h2>The experiment is now complete.</h2>
-    </div>
-    <div style="text-align: center;">
-        <p>Thank you for your participantion, please click the button below to return to Prolific.</p>
-        <p>The link below should take you to the completion page. Your completion code is <b>CYO20G00</b>, this should be filled in automatically for you, but please make a note of it to ensure your payment goes through.</p>
-        <a href="https://app.prolific.com/submissions/complete?cc=CYO20G00" class="btn btn-primary">Return to Prolific</a>
-    </div>
+
+    {{ if is_abandoned }}
+        <div style="text-align: center;">
+            <h2 style="color: #a94442">Session Timed Out</h2>
+            <p>Your session has expired due to inactivity</p>
+            <p>You can no longer participate in this experiment.</p>
+        </div>
+
+    {{ else }}
+        <div style="text-align: center;">
+            <h2>The experiment is now complete.</h2>
+        </div>
+        <div style="text-align: center;">
+            <p>Thank you for your participantion, please click the button below to return to Prolific.</p>
+            <p>The link below should take you to the completion page. Your completion code is <b>CYO20G00</b>, this should be filled in automatically for you, but please make a note of it to ensure your payment goes through.</p>
+            <a href="https://app.prolific.com/submissions/complete?cc=CYO20G00" class="btn btn-primary">Return to Prolific</a>
+        </div>
+    {{ endif }}
 </div>
 {{ endblock }}
