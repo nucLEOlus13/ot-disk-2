@@ -46,13 +46,13 @@ class C(BaseConstants):
     NUM_BLOCKS: int = 4
 
     # Primary timeout: minimum time before a trial set can be considered for abandonment
-    TRIAL_SET_TIMEOUT_MINUTES: int = 1 # chnaged from 60
+    TRIAL_SET_TIMEOUT_MINUTES: int = 115 # chnaged from 60
 
     # Inactivity timeout: if no response for this many minutes, consider participant inactive
     # Trial set is only abandoned if BOTH conditions are met:
     # 1. Time since lock > TRIAL_SET_TIMEOUT_MINUTES
     # 2. Time since last response > INACTIVITY_TIMEOUT_MINUTES
-    INACTIVITY_TIMEOUT_MINUTES: int = 1 # changed from 5
+    INACTIVITY_TIMEOUT_MINUTES: int = 5 # changed from 5
 
     # Optional: List of specific trial set IDs to load
     # If empty, all trial sets from CSV will be loaded
