@@ -46,7 +46,7 @@ class C(BaseConstants):
     NUM_BLOCKS: int = 4
 
     # Primary timeout: minimum time before a trial set can be considered for abandonment
-    TRIAL_SET_TIMEOUT_MINUTES: int = 115 # chnaged from 60
+    TRIAL_SET_TIMEOUT_MINUTES: int = 132 # chnaged from 60
 
     # Inactivity timeout: if no response for this many minutes, consider participant inactive
     # Trial set is only abandoned if BOTH conditions are met:
