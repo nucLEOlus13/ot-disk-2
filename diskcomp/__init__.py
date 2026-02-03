@@ -512,6 +512,57 @@ class StimuliComparisonPage(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
+        trial_set = player.get_assigned_trial_set()
+
+        # chek for interrupted attention checks
+        if trial_set:
+            # Calculate where we are in the experiment
+            current_block = (trial_set.current_trial // C.TRIALS_IN_BLOCK) + 1
+            current_pos = trial_set.current_trial % C.TRIALS_IN_BLOCK
+            
+            # Look for an attention check that belongs here but has no response
+            pending_checks = AttentionCheck.filter(
+                trial_set=trial_set,
+                block=current_block, 
+                position_in_block=current_pos,
+                response="" # It hasn't been answered yet
+            )
+
+            if pending_checks:
+                check = pending_checks[0]
+
+                # if refreshed, "already_shown" may be true, so we need to restore the previous state 
+                if not check.already_shown:
+                    check.already_shown = True
+                    # initialise display side logic
+                    if randint(0, 1) == 0:
+                        left_option = check.correct_option
+                        right_option = check.incorrect_option
+                        check.displayed_left = "correct"
+                    else:
+                        left_option = check.incorrect_option
+                        right_option = check.correct_option
+                        check.displayed_left = "incorrect"
+                else: 
+                    # it was shown before ( refresh case)
+                    # recover which side was correct so the user sees the same thing
+                    if check.displayed_left == "correct":
+                        left_option = check.correct_option
+                        right_option = check.incorrect_option
+                    else:
+                        left_option = check.incorrect_option
+                        right_option = check.correct_option
+                return {
+                    "trial_id": check.check_id,
+                    "target": check.target,
+                    "left_option": left_option,
+                    "right_option": right_option,
+                    "num_trials": C.TOTAL_TRIALS,
+                    "trials_in_block": C.TRIALS_IN_BLOCK,
+                    "page_type": "attention_check", # VITAL: Tells JS to treat this as an AC
+                    "image_preloads": DataCache.get_image_file_list(),
+                }
+
         trial = get_current_trial(player)
         if not trial:
             return {
