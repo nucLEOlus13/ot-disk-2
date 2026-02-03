@@ -406,9 +406,17 @@ def creating_session(subsession: Subsession) -> None:
                 # range of possible trials (avoid first and last ones)
                 safe_range = range(5, C.TRIALS_IN_BLOCK - 5)
 
-                # pick unique random position from that range
-                positions = sorted(sample(safe_range, C.ATTENTION_CHECKS_PER_BLOCK))
-                
+                MIN_DISTANCE = 15
+
+                while True: 
+                    # pick unique random position from that range
+                    positions = sorted(sample(safe_range, C.ATTENTION_CHECKS_PER_BLOCK))
+                    print(f"Block {block}: Sampled attention check positions: {positions}")
+                    # check distance between positions, if too close, loop again and resample
+                    if all(positions[i+1] - positions[i] >= MIN_DISTANCE for i in range(len(positions)-1)):
+                        break 
+
+                    
                 #print(f"Block {block}: Creating {len(positions)} attention checks at positions {positions}")
                 
                 for check_num, position in enumerate(positions):

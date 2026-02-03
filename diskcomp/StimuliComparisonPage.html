@@ -176,7 +176,13 @@
             if (pageType.value === 'practice') {
                 updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
                 trialInfo.innerHTML = 'Practice ' + trialInfo.innerHTML;
-            } else {
+            } 
+
+            else if (pageType.value === "attention_check") {
+                trialInfo.innerHTML = 'Attention Check';
+            }
+            
+            else {
                 updateTrialInfo(trialInfo, parseInt(trial.value)+1, nTrials, trialsInBlock);
             }
 
