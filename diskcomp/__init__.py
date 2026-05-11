@@ -38,7 +38,7 @@ class C(BaseConstants):
     PLAYERS_PER_GROUP: int | None = None
     NUM_ROUNDS: int = 1
     STIM_PATH: Path = Path("stimuli")
-    STIM_CSV: Path = Path(__file__).parent / "_private/trial_list_session_2.csv" # updated by CS, 30-04-2026
+    STIM_CSV: Path = Path(__file__).parent / "_private/trial_list_session_3.csv" # updated by CS, 11-05-2026
     STIM_IMAGE_CSV: Path = Path(__file__).parent / "_private/stim.csv"
     NUM_PRACTICE_TRIALS: int = 3
     TRIALS_IN_BLOCK: int = 107 # updated from 107
